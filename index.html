@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Schools Spending Tracker</title>
+    
+    <!-- PWA Manifest and Theme Color -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#4F46E5">
+
+    <!-- Icons for PWA -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icon.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icon.png">
+
+    <!-- Lottie Player for animations -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Charting & PDF Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        // Tailwind CSS Configuration
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        hindi: ['Noto Sans Devanagari', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: { 
+                            50: '#EEF2FF', 100: '#E0E7FF', 200: '#C7D2FE', 300: '#A5B4FC', 400: '#818CF8', 
+                            500: '#6366F1', 600: '#4F46E5', 700: '#4338CA', 800: '#3730A3', 900: '#312E81'
+                        },
+                        "bg-light": '#F8FAFC', // Slate 50
+                        "bg-dark": '#0B1120',   // Custom Dark Blue
+                        "card-light": '#FFFFFF',
+                        "card-dark": '#1E293B', // Slate 800
+                        "text-primary-light": '#0F172A', // Slate 900
+                        "text-primary-dark": '#F1F5F9', // Slate 100
+                        "text-secondary-light": '#64748B', // Slate 500
+                        "text-secondary-dark": '#94A3B8', // Slate 400
+                        "separator-light": '#E2E8F0', // Slate 200
+                        "separator-dark": '#334155' // Slate 700
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; transition: background-color 0.3s, color 0.3s; font-family: 'Inter', sans-serif; }
+        .font-hindi { font-family: 'Noto Sans Devanagari', sans-serif; }
+        .ios-input { border: none; background-color: transparent; width: 100%; padding: 12px 0; font-size: 1rem; color: inherit; }
+        .ios-input:focus { outline: none; } .ios-input::placeholder { color: #9CA3AF; }
+        .modal-backdrop { background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity 0.3s ease; }
+        
+        @keyframes slide-in-up { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slide-out-down { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pop-in { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes list-item-in { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+
+        .modal-in { animation: slide-in-up 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+        .modal-out { animation: slide-out-down 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+        .page-enter-active { animation: fade-in 0.4s ease-out; }
+        .popup-enter-active { animation: pop-in 0.3s ease-out forwards; }
+        .list-item-enter { animation: list-item-in 0.4s ease-out forwards; opacity: 0; }
+
+        .nav-item { transition: all 0.2s ease-in-out; }
+        .nav-item.active { color: theme('colors.primary.600'); } .dark .nav-item.active { color: theme('colors.primary.400'); }
+        .custom-toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px); background-color: rgba(15, 23, 42, 0.8); color: white; padding: 12px 24px; border-radius: 9999px; z-index: 110; opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.2); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+        .custom-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .progress-bar-bg { background-color: theme('colors.separator-light'); border-radius: 9999px; overflow: hidden; } .dark .progress-bar-bg { background-color: theme('colors.separator-dark'); }
+        .progress-bar-fill { height: 100%; border-radius: 9999px; transition: width 0.5s ease-in-out; }
+        .stat-card-icon-container .fa-beat { animation-duration: 1.5s; }
+        .stat-card-btn:hover .fa-beat { animation-play-state: running; }
+
+        .skeleton { background-color: #e2e8f0; border-radius: 0.5rem; } .dark .skeleton { background-color: #334155; }
+        .skeleton-animate { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-bg-light dark:bg-bg-dark text-text-primary-light dark:text-text-primary-dark">
+    
+    <div id="splash-screen" class="fixed inset-0 bg-bg-light dark:bg-bg-dark flex flex-col items-center justify-center z-[200] transition-opacity duration-500 ease-out">
+        <div class="text-center">
+            <lottie-player src="w.json" background="transparent" speed="1" style="width: 250px; height: 250px; margin: auto;" loop autoplay></lottie-player>
+            <h1 class="text-3xl font-black mt-4 bg-gradient-to-r from-primary-600 to-primary-400 text-transparent bg-clip-text">Schools Spending</h1>
+            <p class="text-text-secondary-light dark:text-text-secondary-dark">Modern Spending Tracker</p>
+        </div>
+    </div>
+
+    <div id="app-root">
+        <!-- Login Screen -->
+        <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 hidden relative">
+             <button id="login-theme-toggle" class="absolute top-6 right-6 h-10 w-10 flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 text-text-secondary-light dark:text-text-secondary-dark transition-colors"></button>
+             <div class="w-full max-w-sm text-center">
+                <div class="inline-block p-5 bg-gradient-to-br from-primary-600 to-primary-400 text-white rounded-full mb-6 shadow-lg shadow-primary-500/30 transform hover:scale-110 transition-transform">
+                    <i class="fas fa-wallet fa-3x"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold">Welcome Back</h1>
+                <p class="text-text-secondary-light dark:text-text-secondary-dark mt-1">Sign in to track your school's spending</p>
+                <div class="bg-card-light dark:bg-card-dark rounded-xl mt-8 text-left shadow-md shadow-slate-200/50 dark:shadow-black/20">
+                    <form id="login-form" class="divide-y divide-separator-light dark:divide-separator-dark">
+                        <div class="px-4 flex items-center gap-3">
+                            <i class="fas fa-envelope text-text-secondary-light"></i>
+                            <input type="email" id="email" required class="ios-input" placeholder="Email Address">
+                        </div>
+                        <div class="px-4 flex items-center gap-3">
+                            <i class="fas fa-lock text-text-secondary-light"></i>
+                            <input type="password" id="password" required class="ios-input" placeholder="Password">
+                        </div>
+                    </form>
+                </div>
+                <button type="submit" form="login-form" id="login-button" class="w-full font-semibold mt-6 py-3 rounded-lg bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:opacity-90 transition-all flex items-center justify-center text-lg shadow-lg shadow-primary-500/30 active:scale-95">
+                    <span id="login-button-text">Sign In</span>
+                    <i id="login-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                </button>
+                <p id="login-error" class="text-red-500 text-sm mt-4 min-h-[20px]"></p>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="hidden">
+            <div class="flex flex-col h-screen">
+                <main id="main-content" class="flex-1 overflow-y-auto pb-24 px-4 sm:px-6 lg:px-8 pt-6"></main>
+                <nav class="fixed bottom-0 left-0 right-0 bg-white/70 dark:bg-card-dark/70 backdrop-blur-xl border-t border-separator-light/50 dark:border-separator-dark/50">
+                    <div class="max-w-md mx-auto flex justify-around">
+                        <button data-page="dashboard" class="nav-item flex-1 flex flex-col items-center py-2 text-text-secondary-light dark:text-text-secondary-dark space-y-1 m-1"><i class="fas fa-chart-pie text-xl"></i><span class="text-xs font-medium">Dashboard</span></button>
+                        <button data-page="spending" class="nav-item flex-1 flex flex-col items-center py-2 text-text-secondary-light dark:text-text-secondary-dark space-y-1 m-1"><i class="fas fa-receipt text-xl"></i><span class="text-xs font-medium">Spending</span></button>
+                        <button data-page="budgets" class="nav-item flex-1 flex flex-col items-center py-2 text-text-secondary-light dark:text-text-secondary-dark space-y-1 m-1"><i class="fas fa-bullseye text-xl"></i><span class="text-xs font-medium">Budgets</span></button>
+                        <button data-page="notifications" class="nav-item flex-1 flex flex-col items-center py-2 text-text-secondary-light dark:text-text-secondary-dark space-y-1 m-1 relative">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span class="text-xs font-medium">Alerts</span>
+                            <span id="notification-badge" class="absolute top-1 right-6 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-white dark:border-card-dark"></span>
+                        </button>
+                        <button data-page="settings" class="nav-item flex-1 flex flex-col items-center py-2 text-text-secondary-light dark:text-text-secondary-dark space-y-1 m-1"><i class="fas fa-cog text-xl"></i><span class="text-xs font-medium">Settings</span></button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- Modals -->
+        <div id="spending-modal" class="fixed inset-0 z-50 flex items-end justify-center hidden modal-backdrop"><div id="spending-modal-content" class="bg-bg-light dark:bg-card-dark rounded-t-3xl shadow-xl w-full max-w-lg p-4 space-y-6 transform translate-y-full"><div class="flex justify-between items-center px-2 pt-2"><h2 id="spending-modal-title" class="text-2xl font-bold">Add Spending</h2><button id="close-spending-modal" class="h-8 w-8 flex items-center justify-center rounded-full bg-gray-300/50 dark:bg-gray-600/50 text-text-secondary-light hover:bg-gray-400/50 dark:hover:bg-gray-500/50 transition"><i class="fas fa-times"></i></button></div><form id="spending-form" class="space-y-4"><input type="hidden" id="spending-id"><div class="bg-card-light dark:bg-card-dark rounded-xl p-4 space-y-4"><input type="date" id="spending-date" required class="ios-input w-full"><input type="number" id="spending-amount" required min="0.01" step="0.01" inputmode="decimal" class="ios-input w-full" placeholder="Amount (₹)"><select id="spending-category" required class="ios-input w-full"></select></div><div class="bg-card-light dark:bg-card-dark rounded-xl p-4"><textarea id="spending-description" rows="4" required class="ios-input w-full font-hindi" placeholder="विवरण... (Description)"></textarea></div><button type="submit" id="submit-spending-button" class="w-full font-semibold py-3 rounded-lg bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:opacity-90 transition flex items-center justify-center shadow-lg shadow-primary-500/30 active:scale-95"><i id="spending-modal-icon" class="fas fa-plus mr-2"></i><span id="spending-modal-btn-text">Add Spending</span><i id="spending-modal-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i></button></form></div></div>
+        <div id="budget-modal" class="fixed inset-0 z-50 flex items-end justify-center hidden modal-backdrop"><div id="budget-modal-content" class="bg-bg-light dark:bg-card-dark rounded-t-3xl shadow-xl w-full max-w-lg p-4 space-y-6 transform translate-y-full"><div class="flex justify-between items-center px-2 pt-2"><h2 id="budget-modal-title" class="text-2xl font-bold">Set Budget</h2><button id="close-budget-modal" class="h-8 w-8 flex items-center justify-center rounded-full bg-gray-300/50 dark:bg-gray-600/50 text-text-secondary-light hover:bg-gray-400/50 dark:hover:bg-gray-500/50 transition"><i class="fas fa-times"></i></button></div><form id="budget-form" class="space-y-4"><div class="bg-card-light dark:bg-card-dark rounded-xl p-4 space-y-4"><select id="budget-category" required class="ios-input w-full"></select><input type="number" id="budget-amount" required min="0" step="0.01" inputmode="decimal" class="ios-input w-full" placeholder="Budget Amount (₹)"></div><button type="submit" id="submit-budget-button" class="w-full font-semibold py-3 rounded-lg bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:opacity-90 transition flex items-center justify-center shadow-lg shadow-primary-500/30 active:scale-95"><i class="fas fa-save mr-2"></i><span>Save Budget</span></button></form></div></div>
+        <div id="category-modal" class="fixed inset-0 z-50 flex items-end justify-center hidden modal-backdrop"><div id="category-modal-content" class="bg-bg-light dark:bg-card-dark rounded-t-3xl shadow-xl w-full max-w-lg p-4 space-y-6 transform translate-y-full"><div class="flex justify-between items-center px-2 pt-2"><h2 class="text-2xl font-bold">Manage Categories</h2><button id="close-category-modal" class="h-8 w-8 flex items-center justify-center rounded-full bg-gray-300/50 dark:bg-gray-600/50 text-text-secondary-light hover:bg-gray-400/50 dark:hover:bg-gray-500/50 transition"><i class="fas fa-times"></i></button></div><div id="category-list" class="bg-card-light dark:bg-card-dark rounded-xl p-4 space-y-2 max-h-60 overflow-y-auto"></div><form id="add-category-form" class="flex gap-3"><input type="text" id="new-category-name" required class="ios-input bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2 w-full" placeholder="New category name..."><button type="submit" class="font-semibold py-2 px-4 rounded-lg bg-primary-600 text-white hover:opacity-90 transition active:scale-95">Add</button></form></div></div>
+        <div id="edit-category-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 hidden modal-backdrop"><div class="bg-card-light dark:bg-card-dark rounded-3xl shadow-xl w-full max-w-sm p-6 space-y-4 popup-enter-active"><h3 class="text-lg font-bold text-center">Edit Category</h3><form id="edit-category-form"><input type="hidden" id="old-category-name"><div class="bg-card-light dark:bg-card-dark rounded-xl px-4"><input type="text" id="edit-category-name-input" required class="ios-input w-full" placeholder="New category name"></div><div class="flex justify-end space-x-3 pt-2"><button type="button" id="cancel-edit-category-btn" class="font-semibold px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:opacity-90 active:scale-95">Cancel</button><button type="submit" id="submit-edit-category-btn" class="font-semibold px-4 py-2 rounded-lg bg-primary-600 text-white hover:opacity-90 active:scale-95 flex items-center justify-center min-w-[90px]"><span id="edit-cat-btn-text">Save</span><i id="edit-cat-spinner" class="fas fa-spinner fa-spin hidden"></i></button></div></form></div></div>
+        <div id="delete-confirm-modal" data-id-to-delete="" class="fixed inset-0 z-[60] flex items-center justify-center p-4 hidden modal-backdrop"><div class="bg-card-light dark:bg-card-dark rounded-3xl shadow-xl w-full max-w-sm p-6 text-center popup-enter-active"><div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/50 mb-4"><i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400 text-xl"></i></div><h3 id="delete-confirm-title" class="text-lg font-bold">Delete Entry</h3><p id="delete-confirm-text" class="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-2">Are you sure? This action cannot be undone.</p><div class="mt-6 flex justify-center space-x-4"><button id="confirm-delete-btn" class="font-semibold px-6 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition active:scale-95 flex items-center justify-center min-w-[90px]"><span id="delete-btn-text">Delete</span><i id="delete-spinner" class="fas fa-spinner fa-spin hidden"></i></button><button id="cancel-delete-btn" class="font-semibold px-6 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 transition active:scale-95">Cancel</button></div></div></div>
+        <div id="password-confirm-modal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 hidden modal-backdrop"><div class="bg-card-light dark:bg-card-dark rounded-3xl shadow-xl w-full max-w-sm p-6 popup-enter-active"><h3 class="text-lg font-bold text-center">Confirm Action</h3><p class="text-sm text-text-secondary-light dark:text-text-secondary-dark mt-2 text-center">For your security, please enter your password to continue.</p><form id="password-confirm-form" class="space-y-4 mt-4"><div class="bg-card-light dark:bg-card-dark rounded-xl px-4"><input type="password" id="confirm-password-input" required class="ios-input w-full" placeholder="Password"></div><p id="password-confirm-error" class="text-red-500 text-sm min-h-[20px]"></p><div class="flex justify-end space-x-3"><button type="button" id="cancel-password-confirm-btn" class="font-semibold px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-800 hover:opacity-90 active:scale-95">Cancel</button><button type="submit" id="submit-password-confirm-btn" class="font-semibold px-4 py-2 rounded-lg bg-primary-600 text-white hover:opacity-90 active:scale-95">Confirm</button></div></form></div></div>
+        <div id="upload-progress-modal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 hidden modal-backdrop"><div class="bg-card-light dark:bg-card-dark rounded-3xl shadow-xl w-full max-w-sm p-6 text-center space-y-4 popup-enter-active"><h3 class="text-lg font-bold">Uploading Report</h3><p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Please wait while the file is being sent to Telegram.</p><div class="w-full bg-slate-200 rounded-full h-2.5 dark:bg-slate-700"><div id="upload-progress-bar" class="bg-primary-600 h-2.5 rounded-full transition-all duration-300 ease-linear" style="width: 0%"></div></div><p id="upload-progress-text" class="text-lg font-bold text-primary-600 dark:text-primary-400">0%</p></div></div>
+        <div id="toast-container" class="custom-toast"></div>
+    </div>
+    
+    <script type="text/javascript">
+        var NotoSansDevanagari = `AAEAAAARAQAABAAQR0RFRg...`; // Placeholder for Base64 font data
+    </script>
+
+    <!-- Firebase and App Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, EmailAuthProvider, reauthenticateWithCredential } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, doc, deleteDoc, serverTimestamp, orderBy, setDoc, writeBatch, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        const CONFIG = {
+            firebase: { apiKey: "AIzaSyAzZwllmtJocBK8FHflZIVJ2oKe2Nju1Ns", authDomain: "schoolspend.firebaseapp.com", projectId: "schoolspend", storageBucket: "schoolspend.appspot.com", messagingSenderId: "562341366449", appId: "1:562341366449:web:685704032da6aaa38b090" },
+            authorizedEmails: ['alinemat78@gmail.com', 'mdali82350@gmail.com', 'afsananaz009@gmail.com'],
+            telegram: { botToken: "8379941618:AAHhD9JA5Vhx_ZmUBKu4u5RaR2q92IQkt1g", channelId: "-1002681993342" },
+            defaultCategories: ['Food', 'Study Material', 'School Development', 'Other'],
+            splashScreenDuration: 2500,
+        };
+
+        let currentUser, allSpendings = [], categories = [], budgets = {}, charts = {};
+        let spendingsUnsubscribe = null, categoriesUnsubscribe = null, budgetsUnsubscribe = null;
+        let passwordConfirmAction = null;
+        let isAuthReady = false, isMinSplashTimeOver = false;
+        let deferredInstallPrompt;
+
+        const ui = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(el => [el.id.replace(/-/g, '_'), el]));
+        
+        const app = initializeApp(CONFIG.firebase);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const manifest = {
+            "name": "Schools Spending Tracker", "short_name": "Spending", "start_url": ".", "display": "standalone",
+            "background_color": "#F8FAFC", "theme_color": "#4F46E5",
+            "icons": [
+                { "src": "icon.png", "type": "image/png", "sizes": "192x192" },
+                { "src": "icon.png", "type": "image/png", "sizes": "512x512" }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        document.head.insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(manifestBlob)}">`);
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); 
+            deferredInstallPrompt = e;
+            const installBtn = document.getElementById('install-app-btn-settings');
+            if (installBtn) installBtn.style.display = 'flex';
+        });
+
+        function tryHideSplashScreen() { if (isAuthReady && isMinSplashTimeOver) { ui.splash_screen.style.opacity = '0'; setTimeout(() => { ui.splash_screen.style.display = 'none'; }, 500); } }
+        function showMainApp() { ui.login_screen.classList.add('hidden'); ui.main_app.classList.remove('hidden'); tryHideSplashScreen(); }
+        function showLoginScreen() { ui.main_app.classList.add('hidden'); ui.login_screen.classList.remove('hidden'); tryHideSplashScreen(); }
+        setTimeout(() => { isMinSplashTimeOver = true; tryHideSplashScreen(); }, CONFIG.splashScreenDuration);
+
+        function applyTheme(theme) { document.documentElement.classList.toggle('dark', theme === 'dark'); localStorage.setItem('theme', theme); updateThemeToggleButtons(); }
+        function toggleTheme() { applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'); navigateTo(localStorage.getItem('currentPage') || 'dashboard', true); }
+        function updateThemeToggleButtons() {
+            const isDark = document.documentElement.classList.contains('dark'); const icon = `<i class="fas fa-${isDark ? 'sun' : 'moon'}"></i>`;
+            if (ui.login_theme_toggle) ui.login_theme_toggle.innerHTML = icon;
+            const settingsBtn = document.getElementById('settings-theme-toggle-btn');
+            if (settingsBtn) settingsBtn.innerHTML = `${icon} Switch to ${isDark ? 'Light' : 'Dark'} Mode`;
+        }
+        applyTheme(localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+        ui.login_theme_toggle.addEventListener('click', toggleTheme);
+
+        onAuthStateChanged(auth, user => {
+            if (user && CONFIG.authorizedEmails.includes(user.email)) { currentUser = user; initAppForUser(); }
+            else {
+                currentUser = null;
+                if (spendingsUnsubscribe) spendingsUnsubscribe(); if (categoriesUnsubscribe) categoriesUnsubscribe(); if (budgetsUnsubscribe) budgetsUnsubscribe();
+                if (user) { signOut(auth).catch(()=>{}); showToast("Access Denied.", 'error'); }
+                showLoginScreen();
+            }
+            if (!isAuthReady) { isAuthReady = true; tryHideSplashScreen(); }
+        });
+        ui.login_form.addEventListener('submit', e => {
+            e.preventDefault(); setButtonLoading(ui.login_button, true, { textEl: ui.login_button_text, spinnerEl: ui.login_spinner }); ui.login_error.textContent = '';
+            signInWithEmailAndPassword(auth, ui.email.value, ui.password.value)
+                .catch(error => { const msg = { 'auth/invalid-credential': "Invalid credentials." }[error.code] || "An error occurred."; ui.login_error.textContent = msg; })
+                .finally(() => setButtonLoading(ui.login_button, false, { textEl: ui.login_button_text, spinnerEl: ui.login_spinner }));
+        });
+
+        function initAppForUser() {
+            showMainApp();
+            listenForCategories();
+            listenForSpendings();
+            listenForBudgets();
+            setupNavigation();
+            setupModalListeners();
+            navigateTo(localStorage.getItem('currentPage') || 'dashboard');
+        }
+
+        function setupNavigation() { document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.page))); }
+        function navigateTo(page, forceRefresh = false) {
+            const currentPage = localStorage.getItem('currentPage');
+            if (page === currentPage && !forceRefresh) return;
+            
+            localStorage.setItem('currentPage', page);
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
+            const pages = { dashboard: renderDashboard, spending: renderSpendingPage, budgets: renderBudgetsPage, notifications: renderNotificationsPage, settings: renderSettingsPage };
+            
+            if (pages[page]) { 
+                Object.values(charts).forEach(chart => chart?.destroy()); 
+                charts = {}; 
+                ui.main_content.innerHTML = '';
+                setTimeout(() => { 
+                    pages[page](); 
+                    ui.main_content.classList.add('page-enter-active');
+                    setTimeout(() => ui.main_content.classList.remove('page-enter-active'), 400);
+                }, 10);
+            }
+        }
+
+        function listenForSpendings() {
+            if (spendingsUnsubscribe) spendingsUnsubscribe();
+            const q = query(collection(db, "spendings"), orderBy("date", "desc"));
+            spendingsUnsubscribe = onSnapshot(q, snapshot => {
+                allSpendings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const currentPage = localStorage.getItem('currentPage') || 'dashboard';
+                navigateTo(currentPage, true);
+                updateNotificationBadge();
+            }, error => { console.error("Firestore read failed: ", error); ui.main_content.innerHTML = renderErrorState("Connection Error", "Could not load data from the server. Please check your internet connection."); });
+        }
+        function listenForCategories() {
+            if (categoriesUnsubscribe) categoriesUnsubscribe();
+            const ref = doc(db, `school_config`, "categories");
+            categoriesUnsubscribe = onSnapshot(ref, async (docSnap) => {
+                categories = (docSnap.exists() && docSnap.data().items?.length > 0) ? docSnap.data().items.sort() : CONFIG.defaultCategories.sort();
+                if (!docSnap.exists()) { await setDoc(ref, { items: CONFIG.defaultCategories }); }
+                updateCategorySelects();
+                if(!ui.category_modal.classList.contains('hidden')) renderCategoryList();
+            });
+        }
+        function listenForBudgets() {
+            if(budgetsUnsubscribe) budgetsUnsubscribe();
+            // BUG FIX: The dashboard was showing a budget summary for *all* months. This now correctly targets *only* the current month's budget document.
+            const budgetId = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            const ref = doc(db, "budgets", budgetId);
+            budgetsUnsubscribe = onSnapshot(ref, (docSnap) => {
+                budgets = docSnap.exists() ? docSnap.data() : {};
+                const currentPage = localStorage.getItem('currentPage');
+                if(currentPage === 'dashboard' || currentPage === 'budgets') navigateTo(currentPage, true);
+            });
+        }
+        
+        function renderDashboard() {
+            const today = new Date().toISOString().slice(0, 10);
+            const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay() === 0 ? -6 : 1));
+            const todaySpend = allSpendings.filter(s => s.date === today).reduce((sum, s) => sum + s.amount, 0);
+            const weekSpend = allSpendings.filter(s => s.date >= weekStart.toISOString().slice(0, 10)).reduce((sum, s) => sum + s.amount, 0);
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+            const monthSpend = allSpendings.filter(s => s.date >= monthStart).reduce((sum, s) => sum + s.amount, 0);
+            const todayString = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+            ui.main_content.innerHTML = `
+                <div class="space-y-8">
+                    <div><p class="text-text-secondary-light dark:text-text-secondary-dark font-semibold">${todayString.toUpperCase()}</p><h1 class="text-4xl font-black">Dashboard</h1></div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        ${createStatCard('Today', todaySpend, 'fa-calendar-day', 'bg-blue-100 dark:bg-blue-900/50 text-blue-500', 'blue', 'today')}
+                        ${createStatCard('This Week', weekSpend, 'fa-calendar-week', 'bg-green-100 dark:bg-green-900/50 text-green-500', 'green', 'thisweek')}
+                        ${createStatCard('This Month', monthSpend, 'fa-coins', 'bg-purple-100 dark:bg-purple-900/50 text-purple-500', 'purple', 'thismonth')}
+                    </div>
+                    <div class="bg-card-light dark:bg-card-dark rounded-xl p-4 shadow-md shadow-slate-200/50 dark:shadow-black/20"><h2 class="font-bold text-lg mb-4">Current Month Budget</h2>${renderBudgetSummary()}</div>
+                    <div class="grid lg:grid-cols-5 gap-8">
+                        <div class="lg:col-span-2 bg-card-light dark:bg-card-dark rounded-xl p-4 shadow-md shadow-slate-200/50 dark:shadow-black/20"><h2 class="font-bold text-lg mb-4">Monthly Breakdown</h2><div class="h-64"><canvas id="category-chart"></canvas></div></div>
+                        <div class="lg:col-span-3 bg-card-light dark:bg-card-dark rounded-xl p-4 shadow-md shadow-slate-200/50 dark:shadow-black/20"><h2 class="font-bold text-lg mb-4">This Week's Spending</h2><div class="h-64"><canvas id="weekly-chart"></canvas></div></div>
+                    </div>
+                </div>`;
+            renderCategoryChart();
+            renderWeeklyChart();
+            document.querySelectorAll('.stat-card-btn').forEach(card => card.addEventListener('click', (e) => { navigateTo('spending'); setTimeout(() => applyQuickFilter(e.currentTarget.dataset.filter), 50); }));
+        }
+
+        function renderSpendingPage() {
+            ui.main_content.innerHTML = `<div class="space-y-6"><div class="flex justify-between items-center"><h1 class="text-4xl font-black">Spending</h1><button id="add-spending-btn-page" class="h-12 w-12 flex items-center justify-center rounded-full bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-500/40 transition-transform hover:scale-110 active:scale-95"><i class="fas fa-plus text-xl"></i></button></div><div class="bg-card-light dark:bg-card-dark rounded-xl p-4 space-y-4 shadow-md shadow-slate-200/50 dark:shadow-black/20"><div class="flex gap-2">${['Today', 'This Week', 'This Month', 'All'].map(p => `<button data-period="${p.toLowerCase().replace(/ /g, '')}" class="quick-filter-btn flex-1 font-semibold py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 transition active:scale-95 text-sm capitalize">${p}</button>`).join('')}</div><select id="filter-category" class="ios-input bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2 w-full text-sm"><option value="all">All Categories</option>${categories.map(c => `<option value="${c}">${c}</option>`).join('')}</select><div class="flex gap-3"><button id="export-all-pdf-btn" class="w-full font-semibold py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 transition flex items-center justify-center gap-2 active:scale-95"><i class="fas fa-file-pdf"></i><span>Export PDF</span></button></div></div><div id="spending-list-container" class="space-y-4">${renderSkeletonLoader()}</div></div>`;
+            applyFilters();
+            document.getElementById('add-spending-btn-page').addEventListener('click', () => showSpendingModal());
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => btn.addEventListener('click', (e) => applyQuickFilter(e.currentTarget.dataset.period)));
+            document.getElementById('export-all-pdf-btn').addEventListener('click', () => { const { data, title } = getFilteredData(); exportPdf(data, title); });
+            document.getElementById('filter-category').addEventListener('change', applyFilters);
+        }
+
+        function renderBudgetsPage() {
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+            const monthlySpendings = allSpendings.filter(s => s.date >= monthStart);
+            const spendingByCategory = monthlySpendings.reduce((acc, s) => { acc[s.category] = (acc[s.category] || 0) + s.amount; return acc; }, {});
+            
+            let budgetListHTML = categories.map(category => {
+                const budgetAmount = budgets[category] || 0;
+                const spentAmount = spendingByCategory[category] || 0;
+                
+                if (budgetAmount > 0) {
+                    const remaining = budgetAmount - spentAmount;
+                    const progress = (spentAmount / budgetAmount) * 100;
+                    let progressColor = 'bg-green-500'; if (progress > 90) progressColor = 'bg-red-500'; else if (progress > 70) progressColor = 'bg-yellow-500';
+                    return `<div class="p-4"><div class="flex justify-between items-center mb-1"><span class="font-semibold">${category}</span><div class="flex items-center gap-2"><span class="text-sm font-medium ${remaining < 0 ? 'text-red-500' : 'text-text-secondary-light'}">${remaining < 0 ? `Overspent by ${formatCurrency(Math.abs(remaining))}` : `${formatCurrency(remaining)} left`}</span><button class="edit-budget-btn text-blue-500 hover:text-blue-700 h-8 w-8 rounded-full flex items-center justify-center hover:bg-blue-500/10 active:scale-95" data-category="${category}" data-amount="${budgetAmount}"><i class="fas fa-pen"></i></button></div></div><div class="progress-bar-bg h-2 w-full"><div class="progress-bar-fill ${progressColor}" style="width: ${Math.min(progress, 100)}%;"></div></div><div class="text-xs text-text-secondary-light mt-1 text-right">${formatCurrency(spentAmount)} of ${formatCurrency(budgetAmount)}</div></div>`;
+                } else {
+                    return `<div class="p-4"><div class="flex justify-between items-center"><span class="font-semibold">${category}</span><button class="set-budget-btn font-semibold text-sm bg-primary-500/10 text-primary-600 px-3 py-1.5 rounded-lg hover:bg-primary-500/20 transition active:scale-95" data-category="${category}">Set Budget</button></div></div>`;
+                }
+            }).join('');
+
+            if(categories.length === 0) budgetListHTML = renderEmptyState("No Categories Found", "fas fa-tags", "Add categories in settings to set budgets for them.");
+            ui.main_content.innerHTML = `<div class="space-y-6"><h1 class="text-4xl font-black">Monthly Budgets</h1><div class="bg-card-light dark:bg-card-dark rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20 divide-y divide-separator-light dark:divide-separator-dark">${budgetListHTML}</div></div>`;
+            
+            document.querySelectorAll('.edit-budget-btn, .set-budget-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                const { category, amount } = e.currentTarget.dataset;
+                showBudgetModal(category, amount || 0);
+            }));
+        }
+
+        function renderNotificationsPage() {
+             let content = `<h1 class="text-4xl font-black mb-6">Alerts</h1>`;
+             const alerts = getActiveAlerts();
+             if (alerts.length > 0) { content += alerts.map(alert => `<div class="bg-${alert.color}-100 dark:bg-${alert.color}-900/50 border-l-4 border-${alert.color}-500 text-${alert.color}-800 dark:text-${alert.color}-200 p-4 rounded-r-lg space-y-4 mb-4 shadow-lg shadow-${alert.color}-500/10"><div class="flex items-start"><i class="fas ${alert.icon} mt-1 mr-3 text-xl"></i><div><p class="font-bold">${alert.title}</p><p class="text-sm">${alert.message}</p></div></div>${alert.actions ? `<div class="flex gap-2 pt-2 justify-end">${alert.actions}</div>` : ''}</div>`).join(''); }
+             else { content += renderEmptyState("All Clear!", "fas fa-check-circle text-green-500", "You have no pending alerts. Great job!"); }
+             ui.main_content.innerHTML = content;
+             document.getElementById('delete-old-btn')?.addEventListener('click', () => { const oldData = getOldData(); showDeleteModal(oldData, `This will permanently delete ${oldData.length} entries older than 3 months.`); });
+             document.getElementById('archive-prev-month-btn')?.addEventListener('click', handleMonthlyExportAndDelete);
+        }
+
+        function renderSettingsPage() {
+            const installBtnHTML = `<button id="install-app-btn-settings" class="w-full text-left flex justify-between items-center p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition border-b border-separator-light dark:border-separator-dark"><span>Install App on Home Screen</span><i class="fas fa-download text-text-secondary-light"></i></button>`;
+            ui.main_content.innerHTML = `<div class="space-y-8"><h1 class="text-4xl font-black">Settings</h1><div class="space-y-2"><h2 class="font-semibold text-text-secondary-light dark:text-text-secondary-dark px-4">General</h2><div class="bg-card-light dark:bg-card-dark rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20 divide-y divide-separator-light dark:divide-separator-dark"><button id="manage-categories-btn" class="w-full text-left flex justify-between items-center p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"><span>Manage Categories</span><i class="fas fa-chevron-right text-text-secondary-light"></i></button>${installBtnHTML}<div class="flex justify-between items-center p-4"><span class="font-semibold">Appearance</span><button id="settings-theme-toggle-btn" class="text-primary-600 dark:text-primary-400 font-semibold px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 active:scale-95 hover:bg-primary-500/10"></button></div></div></div><div class="space-y-2"><h2 class="font-semibold text-text-secondary-light dark:text-text-secondary-dark px-4">Data Management</h2><div class="bg-card-light dark:bg-card-dark rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20 p-4 space-y-3"><p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Export and permanently delete last month's spending data. This action requires password confirmation.</p><button id="monthly-export-delete-btn" class="w-full font-semibold py-2.5 rounded-lg bg-blue-600 text-white hover:opacity-90 transition flex items-center justify-center gap-2 active:scale-95"><i class="fas fa-archive"></i><span>Archive Last Month's Data</span></button></div></div><div class="space-y-2"><h2 class="font-semibold text-text-secondary-light dark:text-text-secondary-dark px-4">Account</h2><div class="bg-card-light dark:bg-card-dark rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20"><div class="flex justify-between items-center p-4"><span class="text-sm">${currentUser.email}</span><button id="logout-btn" class="text-red-500 font-semibold px-3 py-1.5 rounded-lg text-sm hover:bg-red-500/10 active:scale-95">Logout</button></div></div></div></div>`;
+            
+            const installBtn = document.getElementById('install-app-btn-settings');
+            if (deferredInstallPrompt) {
+                installBtn.style.display = 'flex';
+                installBtn.addEventListener('click', async () => {
+                    deferredInstallPrompt.prompt();
+                    const { outcome } = await deferredInstallPrompt.userChoice;
+                    if (outcome === 'accepted') { showToast('App installed successfully!'); installBtn.style.display = 'none'; }
+                    deferredInstallPrompt = null;
+                });
+            } else { installBtn.style.display = 'none'; }
+
+            document.getElementById('logout-btn').addEventListener('click', () => { localStorage.removeItem('currentPage'); signOut(auth); });
+            document.getElementById('monthly-export-delete-btn').addEventListener('click', handleMonthlyExportAndDelete);
+            document.getElementById('manage-categories-btn').addEventListener('click', showCategoryModal);
+            document.getElementById('settings-theme-toggle-btn').addEventListener('click', toggleTheme);
+            updateThemeToggleButtons();
+        }
+
+        function createStatCard(title, amount, icon, colors, accent, filter) { return `<button data-filter="${filter}" class="stat-card-btn bg-card-light dark:bg-card-dark p-4 rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20 flex items-start space-x-4 text-left w-full hover:shadow-lg hover:-translate-y-1 transition-all active:scale-95 border-l-4 border-${accent}-500"><div class="stat-card-icon-container h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-full ${colors}"><i class="fas ${icon} fa-lg fa-beat" style="--fa-animation-iteration-count: 1; animation-play-state: paused;"></i></div><div class="flex-1 min-w-0"><p class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">${title}</p><p class="font-bold text-xl lg:text-2xl truncate">${formatCurrency(amount)}</p></div></button>`; }
+        function renderBudgetSummary() {
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+            const monthlySpendings = allSpendings.filter(s => s.date >= monthStart);
+            const totalBudget = Object.values(budgets).reduce((sum, b) => sum + (parseFloat(b) || 0), 0);
+            const totalSpent = monthlySpendings.reduce((sum, s) => sum + s.amount, 0);
+            if (totalBudget === 0) return renderEmptyState("No Budget Set", "fas fa-piggy-bank", "Go to the Budgets page to set one for this month.");
+            const progress = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0; 
+            const remaining = totalBudget - totalSpent;
+            let progressColor = 'bg-green-500'; if (progress > 90) progressColor = 'bg-red-500'; else if (progress > 70) progressColor = 'bg-yellow-500';
+            return `<div><div class="flex justify-between items-baseline mb-1"><span class="font-semibold">Overall Progress</span><span class="text-sm font-medium ${remaining < 0 ? 'text-red-500' : 'text-text-secondary-light'}">${remaining < 0 ? `Overspent by ${formatCurrency(Math.abs(remaining))}` : `${formatCurrency(remaining)} left`}</span></div><div class="progress-bar-bg h-2.5 w-full"><div class="progress-bar-fill ${progressColor}" style="width: ${Math.min(progress, 100)}%;"></div></div><div class="text-xs text-text-secondary-light mt-1 text-right">${formatCurrency(totalSpent)} of ${formatCurrency(totalBudget)}</div></div>`;
+        }
+        function renderErrorState(title, message) { return `<div class="text-center py-20"><lottie-player src="https://assets9.lottiefiles.com/packages/lf20_6n275dgy.json" background="transparent" speed="1" style="width: 150px; height: 150px; margin: auto;" loop autoplay></lottie-player><h2 class="text-xl font-bold mt-4">${title}</h2><p class="text-text-secondary-light mt-2">${message}</p></div>`; }
+        function renderEmptyState(title, iconClass, message) { return `<div class="text-center py-16 text-text-secondary-light dark:text-text-secondary-dark/70"><i class="${iconClass} text-5xl mb-4"></i><h3 class="font-semibold text-lg text-text-primary-light dark:text-text-primary-dark">${title}</h3><p class="max-w-xs mx-auto">${message}</p></div>`; }
+        function renderSkeletonLoader() {
+            return Array(3).fill('').map(() => `<div class="bg-card-light dark:bg-card-dark rounded-xl shadow-sm p-4 space-y-3 skeleton-animate"><div class="flex items-center gap-4"><div class="h-10 w-10 rounded-lg skeleton"></div><div class="flex-1 space-y-2"><div class="h-4 w-3/4 rounded skeleton"></div><div class="h-3 w-1/2 rounded skeleton"></div></div><div class="w-1/4 space-y-2"><div class="h-4 w-full rounded skeleton"></div><div class="h-3 w-3/4 ml-auto rounded skeleton"></div></div></div></div>`).join('');
+        }
+        function renderSpendingList(spendingsToRender) {
+            const containerEl = document.getElementById('spending-list-container'); if (!containerEl) return;
+            if (spendingsToRender.length === 0) { containerEl.innerHTML = renderEmptyState("No Entries Found", "fas fa-search-minus", "No entries match the selected criteria. Try a different filter."); return; }
+            const groupedSpendings = groupSpendingsByDate(spendingsToRender);
+            let html = '';
+            for (const dateGroup in groupedSpendings) { html += `<h2 class="font-bold text-lg text-text-secondary-light dark:text-text-secondary-dark mt-6 mb-2 px-4">${dateGroup}</h2><div class="bg-card-light dark:bg-card-dark rounded-xl shadow-md shadow-slate-200/50 dark:shadow-black/20 divide-y divide-separator-light dark:divide-separator-dark">${groupedSpendings[dateGroup].map(s => `<div class="spending-item flex items-center gap-4 p-4"><div class="h-10 w-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-primary-500/10 text-primary-600"><i class="fas fa-receipt"></i></div><div class="flex-1 min-w-0"><p class="font-semibold truncate font-hindi">${s.description}</p><p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">${s.category} &bull; ${new Date(s.date+'T00:00:00').toLocaleDateString('en-IN')}</p></div><div class="text-right flex-shrink-0"><p class="font-bold">${formatCurrency(s.amount)}</p><div class="text-xs space-x-3 text-text-secondary-light dark:text-text-secondary-dark mt-1"><button class="edit-btn hover:text-primary-600 transition" data-id='${s.id}'><i class="fas fa-pen"></i> Edit</button><button class="delete-btn hover:text-red-500 transition" data-id='${s.id}'><i class="fas fa-trash"></i> Delete</button></div></div></div>`).join('')}</div>`; }
+            containerEl.innerHTML = html;
+            document.querySelectorAll('.spending-item').forEach((item, index) => { item.classList.add('list-item-enter'); item.style.animationDelay = `${index * 50}ms`; });
+            document.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => showSpendingModal(e.currentTarget.dataset.id)));
+            document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => showDeleteModal(e.currentTarget.dataset.id)));
+        }
+        function renderCategoryChart() {
+            const ctx = document.getElementById('category-chart')?.getContext('2d'); if (!ctx) return;
+            const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+            const monthlySpendings = allSpendings.filter(s => s.date >= monthStart);
+            const dataByCategory = monthlySpendings.reduce((acc, s) => { acc[s.category] = (acc[s.category] || 0) + s.amount; return acc; }, {});
+            if(Object.keys(dataByCategory).length === 0){ ctx.canvas.parentElement.innerHTML = renderEmptyState('No Data', 'fas fa-chart-pie', 'Spend something this month to see a chart here.'); return; }
+            const isDark = document.documentElement.classList.contains('dark');
+            const chartData = { labels: Object.keys(dataByCategory), datasets: [{ data: Object.values(dataByCategory), backgroundColor: ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#3B82F6'], borderColor: isDark ? '#1E293B' : '#FFFFFF', borderWidth: 4 }] };
+            charts.category = new Chart(ctx, { type: 'doughnut', data: chartData, options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: isDark ? '#94A3B8' : '#64748B', padding: 20, usePointStyle: true, pointStyle: 'circle' } } } } });
+        }
+        function renderWeeklyChart() {
+            const ctx = document.getElementById('weekly-chart')?.getContext('2d'); if (!ctx) return;
+            const today = new Date(); const dayOfWeek = today.getDay();
+            const weekStart = new Date(today); weekStart.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)); 
+            const labels = []; const dailyTotals = Array(7).fill(0);
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(weekStart); day.setDate(weekStart.getDate() + i);
+                labels.push(day.toLocaleDateString('en-IN', { weekday: 'short' }));
+                const dayString = day.toISOString().slice(0, 10);
+                allSpendings.forEach(s => { if (s.date === dayString) { dailyTotals[i] += s.amount; } });
+            }
+            if(dailyTotals.every(t => t === 0)) { ctx.canvas.parentElement.innerHTML = renderEmptyState('No Data', 'fas fa-calendar-week', 'No spending has been recorded this week.'); return; }
+            const isDark = document.documentElement.classList.contains('dark');
+            const chartData = { labels, datasets: [{ label: 'Daily Spending', data: dailyTotals, backgroundColor: isDark ? 'rgba(99, 102, 241, 0.5)' : 'rgba(79, 70, 229, 0.5)', borderColor: isDark ? '#818CF8' : '#4F46E5', borderWidth: 2, borderRadius: 4 }] };
+            charts.weekly = new Chart(ctx, { type: 'bar', data: chartData, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { color: isDark ? '#94A3B8' : '#64748B' } }, x: { ticks: { color: isDark ? '#94A3B8' : '#64748B' } } }, plugins: { legend: { display: false } } } });
+        }
+        
+        function setupModalListeners() {
+            ui.close_spending_modal.addEventListener('click', hideSpendingModal); ui.spending_form.addEventListener('submit', handleSpendingFormSubmit);
+            ui.close_budget_modal.addEventListener('click', hideBudgetModal); ui.budget_form.addEventListener('submit', handleBudgetFormSubmit);
+            ui.close_category_modal.addEventListener('click', hideCategoryModal); ui.add_category_form.addEventListener('submit', handleAddCategory);
+            ui.cancel_delete_btn.addEventListener('click', () => hideDeleteModal());
+            ui.confirm_delete_btn.addEventListener('click', async () => {
+                const idToDelete = ui.delete_confirm_modal.dataset.idToDelete;
+                const isBatch = ui.delete_confirm_modal.dataset.isBatch === 'true';
+                if (idToDelete || isBatch) {
+                    setButtonLoading(ui.confirm_delete_btn, true, { textEl: ui.delete_btn_text, spinnerEl: ui.delete_spinner });
+                    if (isBatch) { const items = JSON.parse(idToDelete); await deleteBatch(items); } 
+                    else { await deleteSpending(idToDelete); }
+                    setButtonLoading(ui.confirm_delete_btn, false, { textEl: ui.delete_btn_text, spinnerEl: ui.delete_spinner });
+                }
+                hideDeleteModal();
+            });
+            ui.password_confirm_form.addEventListener('submit', handlePasswordConfirm); ui.cancel_password_confirm_btn.addEventListener('click', hidePasswordConfirmModal);
+            ui.edit_category_form.addEventListener('submit', handleEditCategorySubmit); ui.cancel_edit_category_btn.addEventListener('click', hideEditCategoryModal);
+        }
+        function showSpendingModal(id = null) {
+            const isEditing = id !== null; ui.spending_form.reset();
+            ui.spending_modal_title.textContent = isEditing ? 'Edit Spending' : 'Add Spending'; ui.spending_modal_btn_text.textContent = isEditing ? 'Save Changes' : 'Add Spending';
+            ui.spending_modal_icon.className = `fas ${isEditing ? 'fa-save' : 'fa-plus'} mr-2`;
+            if (isEditing) { const spending = allSpendings.find(s => s.id === id); if (spending) { ui.spending_id.value = id; ui.spending_date.value = spending.date; ui.spending_amount.value = spending.amount; ui.spending_category.value = spending.category; ui.spending_description.value = spending.description; } }
+            else { ui.spending_date.value = new Date().toISOString().split('T')[0]; }
+            ui.spending_modal.classList.remove('hidden'); ui.spending_modal_content.classList.add('modal-in'); ui.spending_modal_content.classList.remove('modal-out', 'translate-y-full');
+        }
+        function hideSpendingModal() { ui.spending_modal_content.classList.add('modal-out'); setTimeout(() => ui.spending_modal.classList.add('hidden'), 350); }
+        async function handleSpendingFormSubmit(e) {
+            e.preventDefault(); setButtonLoading(ui.submit_spending_button, true, { textEl: ui.spending_modal_btn_text, iconEl: ui.spending_modal_icon, spinnerEl: ui.spending_modal_spinner });
+            const amount = parseFloat(ui.spending_amount.value);
+            if(isNaN(amount) || amount <= 0) {
+                showToast('Please enter a valid amount greater than zero.', 'error');
+                setButtonLoading(ui.submit_spending_button, false, { textEl: ui.spending_modal_btn_text, iconEl: ui.spending_modal_icon, spinnerEl: ui.spending_modal_spinner });
+                return;
+            }
+            const id = ui.spending_id.value; const data = { date: ui.spending_date.value, amount: amount, category: ui.spending_category.value, description: ui.spending_description.value, addedBy: currentUser.email };
+            try { if (id) { await setDoc(doc(db, "spendings", id), data, { merge: true }); showToast('Spending updated!'); } else { data.createdAt = serverTimestamp(); await addDoc(collection(db, "spendings"), data); showToast('Spending added!'); } hideSpendingModal(); }
+            catch (error) { showToast('Failed to save spending.', 'error'); }
+            finally { setButtonLoading(ui.submit_spending_button, false, { textEl: ui.spending_modal_btn_text, iconEl: ui.spending_modal_icon, spinnerEl: ui.spending_modal_spinner }); }
+        }
+        function showBudgetModal(categoryToEdit = null, amount = 0) {
+            const isEditing = categoryToEdit !== null;
+            ui.budget_modal_title.textContent = isEditing ? 'Edit Budget' : 'Set Budget';
+            ui.budget_category.value = isEditing ? categoryToEdit : (categories[0] || '');
+            ui.budget_category.disabled = isEditing;
+            ui.budget_amount.value = amount > 0 ? amount : '';
+            ui.budget_modal.classList.remove('hidden');
+            ui.budget_modal_content.classList.add('modal-in');
+            ui.budget_modal_content.classList.remove('modal-out', 'translate-y-full');
+        }
+        function hideBudgetModal() { ui.budget_modal_content.classList.add('modal-out'); setTimeout(() => ui.budget_modal.classList.add('hidden'), 350); }
+        async function handleBudgetFormSubmit(e) {
+            e.preventDefault(); const category = ui.budget_category.value; const amount = parseFloat(ui.budget_amount.value) || 0;
+            const budgetId = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            const ref = doc(db, "budgets", budgetId);
+            try { await setDoc(ref, { [category]: amount }, { merge: true }); showToast(`Budget for ${category} set!`); hideBudgetModal(); }
+            catch (error) { showToast('Failed to set budget.', 'error'); }
+        }
+        function showCategoryModal() { renderCategoryList(); ui.category_modal.classList.remove('hidden'); ui.category_modal_content.classList.add('modal-in'); ui.category_modal_content.classList.remove('modal-out', 'translate-y-full'); }
+        function hideCategoryModal() { ui.category_modal_content.classList.add('modal-out'); setTimeout(() => ui.category_modal.classList.add('hidden'), 350); }
+        function renderCategoryList() {
+            ui.category_list.innerHTML = categories.length > 0 ? categories.map(cat => `<div class="flex justify-between items-center p-2 bg-slate-100 dark:bg-slate-800 rounded-lg"><span>${cat}</span><div class="flex items-center"><button class="edit-category-btn text-blue-500 hover:text-blue-700 h-8 w-8 rounded-full flex items-center justify-center hover:bg-blue-500/10" data-category="${cat}"><i class="fas fa-pen"></i></button><button class="delete-category-btn text-red-500 hover:text-red-700 h-8 w-8 rounded-full flex items-center justify-center hover:bg-red-500/10" data-category="${cat}"><i class="fas fa-trash"></i></button></div></div>`).join('') : renderEmptyState('No Categories', 'fas fa-tags', 'Add a category below to get started.');
+            document.querySelectorAll('.delete-category-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteCategory(e.currentTarget.dataset.category)));
+            document.querySelectorAll('.edit-category-btn').forEach(btn => btn.addEventListener('click', (e) => showEditCategoryModal(e.currentTarget.dataset.category)));
+        }
+        async function handleAddCategory(e) { e.preventDefault(); const newCategory = ui.new_category_name.value.trim(); if (newCategory && !categories.includes(newCategory)) { await updateCategoriesInDb([...categories, newCategory]); ui.new_category_name.value = ''; showToast("Category added!"); } else if (categories.includes(newCategory)) { showToast("Category already exists.", "error"); } }
+        async function handleDeleteCategory(categoryToDelete) {
+            const isCategoryInUse = allSpendings.some(s => s.category === categoryToDelete);
+            if (isCategoryInUse) {
+                showToast('Cannot delete category as it is currently in use.', 'error');
+                return;
+            }
+            await updateCategoriesInDb(categories.filter(c => c !== categoryToDelete));
+            showToast("Category removed!");
+        }
+        async function updateCategoriesInDb(newCategoryArray) { const ref = doc(db, "school_config", "categories"); try { await setDoc(ref, { items: newCategoryArray }); } catch (error) { showToast("Failed to update categories.", "error"); } }
+        
+        function showEditCategoryModal(oldName) {
+            ui.old_category_name.value = oldName;
+            ui.edit_category_name_input.value = oldName;
+            ui.edit_category_modal.classList.remove('hidden');
+        }
+        function hideEditCategoryModal() { ui.edit_category_modal.classList.add('hidden'); }
+        async function handleEditCategorySubmit(e) {
+            e.preventDefault();
+            const oldName = ui.old_category_name.value;
+            const newName = ui.edit_category_name_input.value.trim();
+            if (!newName || newName === oldName) { hideEditCategoryModal(); return; }
+            if (categories.includes(newName)) { showToast('Category name already exists.', 'error'); return; }
+
+            setButtonLoading(ui.submit_edit_category_btn, true, { textEl: ui.edit_cat_btn_text, spinnerEl: ui.edit_cat_spinner });
+            
+            try {
+                const spendingsRef = collection(db, "spendings");
+                const q = query(spendingsRef, where("category", "==", oldName));
+                const snapshot = await getDocs(q);
+                const batch = writeBatch(db);
+                snapshot.forEach(doc => batch.update(doc.ref, { category: newName }));
+                const updatedCategories = categories.map(c => c === oldName ? newName : c);
+                const categoriesRef = doc(db, "school_config", "categories");
+                batch.set(categoriesRef, { items: updatedCategories });
+                await batch.commit();
+                showToast(`Category '${oldName}' updated to '${newName}'!`);
+                hideEditCategoryModal();
+            } catch (error) {
+                console.error("Error updating category:", error);
+                showToast('Failed to update category.', 'error');
+            } finally {
+                setButtonLoading(ui.submit_edit_category_btn, false, { textEl: ui.edit_cat_btn_text, spinnerEl: ui.edit_cat_spinner });
+            }
+        }
+
+        function showPasswordConfirmModal(onConfirm) { passwordConfirmAction = onConfirm; ui.password_confirm_form.reset(); ui.password_confirm_error.textContent = ''; ui.password_confirm_modal.classList.remove('hidden'); }
+        function hidePasswordConfirmModal() { ui.password_confirm_modal.classList.add('hidden'); passwordConfirmAction = null; }
+        async function handlePasswordConfirm(e) {
+            e.preventDefault(); const password = ui.confirm_password_input.value; if (!password) { ui.password_confirm_error.textContent = 'Password cannot be empty.'; return; }
+            ui.password_confirm_error.textContent = ''; const credential = EmailAuthProvider.credential(currentUser.email, password);
+            try { await reauthenticateWithCredential(currentUser, credential); if (typeof passwordConfirmAction === 'function') await passwordConfirmAction(); hidePasswordConfirmModal(); }
+            catch (error) { ui.password_confirm_error.textContent = 'Incorrect password.'; }
+        }
+        function showDeleteModal(idOrItems, text = 'Are you sure? This action cannot be undone.') {
+            const isBatch = Array.isArray(idOrItems);
+            ui.delete_confirm_modal.dataset.isBatch = isBatch;
+            ui.delete_confirm_modal.dataset.idToDelete = isBatch ? JSON.stringify(idOrItems) : idOrItems;
+            ui.delete_confirm_text.textContent = text;
+            ui.delete_confirm_modal.classList.remove('hidden');
+        }
+        function hideDeleteModal() { ui.delete_confirm_modal.classList.add('hidden'); ui.delete_confirm_modal.dataset.idToDelete = ''; ui.delete_confirm_modal.dataset.isBatch = 'false'; }
+        async function deleteSpending(id) { try { await deleteDoc(doc(db, "spendings", id)); showToast('Entry deleted.'); } catch (error) { console.error("Delete failed:", error); showToast('Failed to delete entry.', 'error'); } }
+        async function deleteBatch(itemsToDelete) {
+            if (itemsToDelete.length === 0) { showToast('No items to delete.', 'info'); return; }
+            try { const batch = writeBatch(db); itemsToDelete.forEach(item => batch.delete(doc(db, "spendings", item.id))); await batch.commit(); showToast(`${itemsToDelete.length} entries deleted.`); }
+            catch (error) { showToast('Batch deletion failed.', 'error'); }
+        }
+        async function handleMonthlyExportAndDelete() {
+            const { data, monthName, year } = getPreviousMonthData(); if (data.length === 0) { showToast(`No data for ${monthName} ${year}.`, 'info'); return; }
+            showPasswordConfirmModal(async () => {
+                showToast('Starting archive process...', 'info');
+                try { 
+                    const title = `Monthly Report - ${monthName} ${year}`;
+                    await exportPdf(data, title, { monthName, year }); 
+                    await deleteBatch(data); 
+                }
+                catch (error) { showToast('Process failed. Data not deleted.', 'error'); }
+            });
+        }
+        
+        function getFilteredData() {
+            const category = document.getElementById('filter-category')?.value || 'all';
+            const activePeriodBtn = document.querySelector('.quick-filter-btn.active');
+            const activePeriod = activePeriodBtn ? activePeriodBtn.dataset.period : 'all';
+            
+            let filtered = allSpendings;
+            let title = 'Spending Report';
+
+            if (category !== 'all') {
+                filtered = filtered.filter(s => s.category === category);
+                title += ` for ${category}`;
+            }
+
+            const now = new Date();
+            const today = now.toISOString().slice(0, 10);
+            if (activePeriod === 'today') {
+                filtered = filtered.filter(s => s.date === today);
+                title = `Today's Report` + (category !== 'all' ? ` for ${category}` : '');
+            } else if (activePeriod === 'thisweek') {
+                const weekStart = new Date();
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay() + (weekStart.getDay() === 0 ? -6 : 1));
+                const weekStartStr = weekStart.toISOString().slice(0, 10);
+                filtered = filtered.filter(s => s.date >= weekStartStr);
+                title = `This Week's Report` + (category !== 'all' ? ` for ${category}` : '');
+            } else if (activePeriod === 'thismonth') {
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+                filtered = filtered.filter(s => s.date >= monthStart);
+                title = `This Month's Report` + (category !== 'all' ? ` for ${category}` : '');
+            }
+            
+            return { data: filtered, title };
+        }
+        function applyFilters() { const { data } = getFilteredData(); renderSpendingList(data); }
+        function applyQuickFilter(period) {
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+                const isActive = btn.dataset.period === period;
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('bg-primary-600', isActive);
+                btn.classList.toggle('text-white', isActive);
+                btn.classList.toggle('bg-slate-100', !isActive);
+                btn.classList.toggle('dark:bg-slate-700', !isActive);
+            });
+            applyFilters();
+        }
+        function getOldData() { const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3); return allSpendings.filter(s => new Date(s.date) < threeMonthsAgo); }
+        function getPreviousMonthData() {
+            const now = new Date(), prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const year = prevMonthDate.getFullYear(), month = prevMonthDate.getMonth();
+            const startDate = new Date(year, month, 1).toISOString().slice(0, 10), endDate = new Date(year, month + 1, 0).toISOString().slice(0, 10);
+            const data = allSpendings.filter(s => s.date >= startDate && s.date <= endDate);
+            return { data, monthName: prevMonthDate.toLocaleString('default', { month: 'long' }), year };
+        }
+        
+        function getActiveAlerts() {
+            const alerts = []; const oldData = getOldData();
+            if (oldData.length > 0) { const monthYear = new Date(oldData[0].date).toLocaleString('default', { month: 'long', year: 'numeric' }); alerts.push({ color: 'red', icon: 'fa-exclamation-triangle', title: 'Very Old Data Found', message: `You have ${oldData.length} entries from ${monthYear} (3+ months old). It's recommended to archive and delete this data.`, actions: `<button id="delete-old-btn" class="font-semibold text-red-500 px-3 py-1.5 rounded-lg text-sm hover:bg-red-500/10 active:scale-95">Delete Now</button>` }); }
+            
+            const { data, monthName, year } = getPreviousMonthData();
+            if (data.length > 0 && new Date().getDate() >= 2) { 
+                alerts.push({ color: 'yellow', icon: 'fa-archive', title: 'Archive Reminder', message: `You have ${data.length} entries from last month (${monthName} ${year}). You should archive this data to keep your app running smoothly.`, actions: `<button id="archive-prev-month-btn" class="font-semibold text-blue-600 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-600/10 active:scale-95">Archive Now</button>` }); 
+            }
+            return alerts;
+        }
+        function updateNotificationBadge() { ui.notification_badge.classList.toggle('hidden', getActiveAlerts().length === 0); }
+        
+        async function exportPdf(data, title, details = {}) {
+            if (data.length === 0) { showToast('No data to export.', 'error'); return; }
+            showToast('Generating beautiful PDF...', 'info');
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                if (window.NotoSansDevanagari && window.NotoSansDevanagari.length > 100) {
+                    doc.addFileToVFS('NotoSansDevanagari-Regular-normal.ttf', window.NotoSansDevanagari);
+                    doc.addFont('NotoSansDevanagari-Regular-normal.ttf', 'NotoSansDevanagari', 'normal');
+                } else { console.warn("NotoSansDevanagari font not loaded."); }
+                doc.setFont('helvetica', 'normal');
+
+                const headerColor = '#4338CA';
+                doc.setFillColor(headerColor);
+                doc.rect(0, 0, 210, 28, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(20);
+                doc.text("Schools Spending Tracker", 105, 16, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(11);
+                doc.text("Spending Report", 105, 23, { align: 'center' });
+
+                const total = data.reduce((sum, s) => sum + s.amount, 0);
+                const entryCount = data.length;
+                const averageSpend = entryCount > 0 ? total / entryCount : 0;
+                
+                doc.autoTable({
+                    startY: 35,
+                    head: [['Report Title', 'Total Entries', 'Total Amount', 'Average Spend']],
+                    body: [[ title, entryCount, formatCurrencyForPdf(total), formatCurrencyForPdf(averageSpend) ]],
+                    theme: 'grid',
+                    headStyles: { fillColor: headerColor, textColor: 255, fontStyle: 'bold' }
+                });
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 800; canvas.height = 400;
+                const ctx = canvas.getContext('2d');
+                const dataByCategory = data.reduce((acc, s) => { acc[s.category] = (acc[s.category] || 0) + s.amount; return acc; }, {});
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(79, 70, 229, 0.8)');
+                gradient.addColorStop(1, 'rgba(129, 140, 248, 0.5)');
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: { labels: Object.keys(dataByCategory), datasets: [{ label: 'Spending', data: Object.values(dataByCategory), backgroundColor: gradient, borderColor: '#4338CA', borderWidth: 2, borderRadius: 5 }] },
+                    options: { responsive: false, animation: { duration: 0 }, plugins: { legend: { display: false }, title: { display: true, text: 'Spending by Category', font: { size: 22 }, color: '#111827', padding: { bottom: 20 } } }, scales: { y: { beginAtZero: true, grid: { color: '#E5E7EB' }, ticks: { font: { size: 12 }, color: '#4B5563' } }, x: { grid: { display: false }, ticks: { font: { size: 12 }, color: '#4B5563' } } } }
+                });
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                doc.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 14, doc.autoTable.previous.finalY + 10, 180, 90);
+
+                const head = [['Date', 'Category', 'Description', 'Amount (INR)']];
+                const body = data.map(s => [ new Date(s.date+'T00:00:00').toLocaleDateString('en-IN'), s.category, s.description, s.amount.toFixed(2) ]);
+                
+                doc.autoTable({
+                    head, body, startY: doc.autoTable.previous.finalY + 105, theme: 'striped',
+                    headStyles: { fillColor: headerColor, fontSize: 11 },
+                    styles: { font: 'helvetica', fontSize: 10 },
+                    columnStyles: { 2: { font: 'NotoSansDevanagari' } }
+                });
+                
+                const pageCount = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8); doc.setTextColor(150);
+                    doc.text(`Page ${i} of ${pageCount} | Generated: ${new Date().toLocaleString('en-IN')}`, 105, 290, { align: 'center' });
+                }
+
+                const pdfBlob = doc.output('blob');
+                const fileName = `${title.replace(/[\s/]/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+                doc.save(fileName);
+                showToast('PDF downloaded successfully.');
+                
+                const monthName = details.monthName || new Date().toLocaleString('default', { month: 'long' });
+                const year = details.year || new Date().getFullYear();
+                const caption = `🧾 *${title}*\n\n📅 *Period:* ${monthName} ${year}\n💰 *Total Amount:* ${formatCurrencyForPdf(total)}\n🧾 *Total Entries:* ${data.length}\n\n_This report was auto-generated by the Schools Spending App._`;
+                await sendToTelegramWithProgress(pdfBlob, fileName, caption);
+
+            } catch (error) {
+                console.error("PDF Export/Send Error:", error);
+                showToast(`Operation failed: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        function sendToTelegramWithProgress(blob, fileName, caption) {
+            return new Promise((resolve, reject) => {
+                const formData = new FormData();
+                formData.append('chat_id', CONFIG.telegram.channelId);
+                formData.append('document', blob, fileName);
+                formData.append('caption', caption);
+                formData.append('parse_mode', 'Markdown');
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `https://api.telegram.org/bot${CONFIG.telegram.botToken}/sendDocument`, true);
+
+                ui.upload_progress_modal.classList.remove('hidden');
+
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = Math.round((event.loaded / event.total) * 100);
+                        ui.upload_progress_bar.style.width = percentComplete + '%';
+                        ui.upload_progress_text.textContent = percentComplete + '%';
+                    }
+                });
+
+                xhr.onload = () => {
+                    ui.upload_progress_modal.classList.add('hidden');
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        showToast('Report sent to Telegram!');
+                        resolve(xhr.response);
+                    } else {
+                        const errorData = JSON.parse(xhr.responseText);
+                        const errorMessage = `Telegram API Error: ${errorData.description}`;
+                        showToast(errorMessage, 'error');
+                        reject(new Error(errorMessage));
+                    }
+                };
+
+                xhr.onerror = () => {
+                    ui.upload_progress_modal.classList.add('hidden');
+                    showToast('Network error during upload.', 'error');
+                    reject(new Error('Network error during upload.'));
+                };
+                
+                xhr.send(formData);
+            });
+        }
+        
+        const formatCurrency = (num) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num || 0);
+        const formatCurrencyForPdf = (num) => `INR ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(num || 0)}`;
+        function showToast(message, type = 'success', duration = 3000) {
+            const toast = ui.toast_container; toast.textContent = message;
+            toast.style.backgroundColor = { error: 'rgb(239, 68, 68)', info: 'rgb(59, 130, 246)', success: 'rgb(16, 185, 129)' }[type] || 'rgba(15, 23, 42, 0.9)';
+            toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        function setButtonLoading(button, isLoading, { textEl, spinnerEl, iconEl }) {
+            button.disabled = isLoading;
+            if (isLoading) { textEl?.classList.add('hidden'); iconEl?.classList.add('hidden'); spinnerEl?.classList.remove('hidden'); }
+            else { textEl?.classList.remove('hidden'); iconEl?.classList.remove('hidden'); spinnerEl?.classList.add('hidden'); }
+        }
+        function updateCategorySelects() {
+            const optionsHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            if (ui.spending_category) ui.spending_category.innerHTML = optionsHTML; 
+            if (ui.budget_category) ui.budget_category.innerHTML = optionsHTML;
+            
+            const filterCategory = document.getElementById('filter-category');
+            if (filterCategory) {
+                const currentValue = filterCategory.value;
+                filterCategory.innerHTML = `<option value="all">All Categories</option>${optionsHTML}`;
+                filterCategory.value = currentValue;
+            }
+        }
+        function groupSpendingsByDate(spendings) {
+            const today = new Date(), yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+            const todayStr = today.toISOString().slice(0, 10), yesterdayStr = yesterday.toISOString().slice(0, 10);
+            return spendings.reduce((acc, s) => {
+                let groupName;
+                if (s.date === todayStr) groupName = 'Today'; else if (s.date === yesterdayStr) groupName = 'Yesterday';
+                else groupName = new Date(s.date + 'T00:00:00').toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+                if (!acc[groupName]) acc[groupName] = [];
+                acc[groupName].push(s); return acc;
+            }, {});
+        }
+    </script>
+</body>
+</html>
+
